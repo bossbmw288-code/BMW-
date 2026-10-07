@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>غرفة المحادثة والصوت والفيديو</title>
+    <title>غرفة المحادثة المباشرة السريعة</title>
     <style>
         body { font-family: Arial, sans-serif; background: #121212; color: white; text-align: center; padding: 10px; margin: 0; }
         .video-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 15px; }
-        .video-box { width: 140px; height: 140px; background: #222; border-radius: 10px; overflow: hidden; border: 2px solid #00ffa3; position: relative; }
+        .video-box { width: 140px; height: 140px; background: #222; border-radius: 10px; overflow: hidden; border: 2px solid #00ffa3; }
+        video { width: 100%; height: 100%; object-fit: cover; }
         button { background: #00ffa3; color: black; border: none; padding: 10px 20px; font-size: 15px; font-weight: bold; border-radius: 5px; cursor: pointer; margin: 5px; }
-        #chatBox { height: 200px; border: 1px solid #333; background: #1a1a1a; overflow-y: auto; margin-top: 20px; padding: 10px; text-align: right; border-radius: 8px; }
+        #chatBox { height: 180px; border: 1px solid #333; background: #1a1a1a; overflow-y: auto; margin-top: 20px; padding: 10px; text-align: right; border-radius: 8px; }
         .message { margin-bottom: 8px; font-size: 14px; }
         .chat-input-area { display: flex; gap: 5px; margin-top: 10px; }
         .chat-input-area input { flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #444; background: #222; color: white; }
@@ -17,111 +18,107 @@
 </head>
 <body>
 
-    <h2>غرفة البث المباشر والدردشة</h2>
+    <h2>غرفة البث السريع والدردشة 🚀</h2>
+    <p id="my-id-display">جاري تجهيز معرف الغرفة الخاص بك...</p>
     
-    <button id="join-btn">انضمام للغرفة (صوت وصورة)</button>
-    <button id="leave-btn" style="background:#ff3b30; color:white; display:none;">مغادرة</button>
+    <div class="chat-input-area" style="margin-bottom: 15px;">
+        <input type="text" id="remote-id-input" placeholder="ضع معرف صديقك للاتصال به...">
+        <button onclick="connectToPeer()">اتصال بالفيديو</button>
+    </div>
 
-    <div class="video-container" id="video-streams"></div>
+    <div class="video-container">
+        <!-- فيديوهات البث -->
+        <div class="video-box"><video id="local-video" autoplay muted playsinline></video></div>
+        <div class="video-box"><video id="remote-video" autoplay playsinline></video></div>
+    </div>
 
     <div id="chatBox">
-        <div class="message"><b>نظام التطبيق:</b> أهلاً بك في غرفتك الجديدة!</div>
+        <div class="message"><b>النظام:</b> تم تشغيل الغرفة بنجاح وبدون قيود أمان!</div>
     </div>
     <div class="chat-input-area">
         <input type="text" id="msgInput" placeholder="اكتب رسالتك هنا...">
-        <button class="send-btn" onclick="sendMessage()">إرسال</button>
+        <button onclick="sendMessage()">إرسال</button>
     </div>
 
-    <!-- مكتبة Agora المحدثة والآمنة -->
-    <script src="https://agora.io"></script>
+    <!-- استدعاء مكتبة PeerJS السحرية المباشرة -->
+    <script src="https://unpkg.com"></script>
     
     <script>
-        const APP_ID = "79d0ac03afbf4f25b72b6d348069f03f"; 
-        const CHANNEL = "main_room"; 
-        const TOKEN = "007eJxTYJgalGf8/YOf5Y6wb5eEv28O7dzivOd8j41IJWNlm/T6DRMUGIzNDSzNDEwNzVOTUk0MUg0TDdOSUi0t04wsDJOTzY2Mkm2PZTUEMjK0PGdlYmSAQBCfkyE3MTMvvig/P5eBAQAjhCHM"
+        let peer = new Peer();
+        let localStream;
+        let currentConn;
 
-        let client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-        let localTracks = [];
-        let remoteUsers = {};
+        // تشغيل الكاميرا فور فتح الصفحة تلقائياً
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+            localStream = stream;
+            document.getElementById('local-video').srcObject = stream;
+        }).catch(err => alert("برجاء التأكد من السماح بإذن الكاميرا: " + err));
 
-        document.getElementById('join-btn').onclick = async () => {
-            try {
-                // محاولة الاتصال بالسيرفر
-                await client.join(APP_ID, CHANNEL, TOKEN, null);
-                
-                // طلب تشغيل الميكروفون والكاميرا مع تفعيل خصائص الموبايل
-                localTracks = await AgoraRTC.createMicrophoneAndCameraTracks(
-                    { microphoneId: null },
-                    { cameraId: null, encoderConfig: "320p_1" }
-                );
-
-                let player = `<div class="video-box" id="user-local"></div>`;
-                document.getElementById('video-streams').insertAdjacentHTML('beforeend', player);
-                
-                // تشغيل محلي فوراً
-                await localTracks[1].play('user-local');
-                
-                // نشر البث للمشتركين
-                await client.publish(localTracks);
-
-                document.getElementById('join-btn').style.display = 'none';
-                document.getElementById('leave-btn').style.display = 'inline-block';
-                
-                alert("تم الانضمام بنجاح وتفعيل الكاميرا!");
-            } catch (error) {
-                console.error(error);
-                alert("حدث خطأ أثناء تشغيل الكاميرا: " + error.message);
-            }
-        };
-
-        client.on('user-published', async (user, mediaType) => {
-            remoteUsers[user.uid] = user;
-            await client.subscribe(user, mediaType);
-
-            if (mediaType === 'video') {
-                let player = document.getElementById(`user-${user.uid}`);
-                if (player) player.remove();
-
-                player = `<div class="video-box" id="user-${user.uid}"></div>`;
-                document.getElementById('video-streams').insertAdjacentHTML('beforeend', player);
-                user.videoTrack.play(`user-${user.uid}`);
-            }
-
-            if (mediaType === 'audio') {
-                user.audioTrack.play();
-            }
+        // عرض معرفك الفريد عند فتح الغرفة
+        peer.on('open', id => {
+            document.getElementById('my-id-display').innerHTML = `معرف غرفتك الحالي هو: <b style="color:#00ffa3;">${id}</b>`;
         });
 
-        client.on('user-unpublished', user => {
-            let player = document.getElementById(`user-${user.uid}`);
-            if (player) player.remove();
+        // استقبال مكالمة فيديو من صديق
+        peer.on('call', call => {
+            call.answer(localStream);
+            call.on('stream', remoteStream => {
+                document.getElementById('remote-video').srcObject = remoteStream;
+            });
         });
 
-        document.getElementById('leave-btn').onclick = async () => {
-            if(localTracks.length > 0) {
-                localTracks[0].stop(); localTracks[0].close();
-                localTracks[1].stop(); localTracks[1].close();
-            }
-            await client.leave();
-            document.getElementById('video-streams').innerHTML = '';
-            document.getElementById('join-btn').style.display = 'inline-block';
-            document.getElementById('leave-btn').style.display = 'none';
-        };
+        // استقبال رسائل شات نصية
+        peer.on('connection', conn => {
+            currentConn = conn;
+            setupChatReceiver(conn);
+        });
 
+        // بدء الاتصال بصديق عبر معرفه
+        function connectToPeer() {
+            let remoteId = document.getElementById('remote-id-input').value;
+            if(!remoteId) return alert("ضع معرف الطرف الآخر أولاً!");
+
+            // بدء مكالمة الفيديو
+            let call = peer.call(remoteId, localStream);
+            call.on('stream', remoteStream => {
+                document.getElementById('remote-video').srcObject = remoteStream;
+            });
+
+            // بدء اتصال الشات النصي
+            currentConn = peer.connect(remoteId);
+            setupChatSender(currentConn);
+        }
+
+        // إرسال رسالة نصية
         function sendMessage() {
-            var input = document.getElementById("msgInput");
-            var text = input.value;
+            let input = document.getElementById("msgInput");
+            let text = input.value;
+            if(!text.trim()) return;
 
-            if(text.trim() !== "") {
-                var chatBox = document.getElementById("chatBox");
-                var newMsg = document.createElement("div");
-                newMsg.className = 'message';
-                newMsg.innerHTML = "<b>أنت:</b> " + text;
-                
-                chatBox.appendChild(newMsg);
-                input.value = "";
-                chatBox.scrollTop = chatBox.scrollHeight;
-            }
+            appendMessage("أنت", text);
+            if(currentConn) currentConn.send(text);
+            input.value = "";
+        }
+
+        function setupChatSender(conn) {
+            conn.on('open', () => {
+                appendMessage("النظام", "متصل الآن بالشات مع الطرف الآخر!");
+            });
+        }
+
+        function setupChatReceiver(conn) {
+            conn.on('data', data => {
+                appendMessage("الطرف الآخر", data);
+            });
+        }
+
+        function appendMessage(sender, text) {
+            let chatBox = document.getElementById("chatBox");
+            let newMsg = document.createElement("div");
+            newMsg.className = 'message';
+            newMsg.innerHTML = `<b>${sender}:</b> ${text}`;
+            chatBox.appendChild(newMsg);
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
     </script>
 </body>
