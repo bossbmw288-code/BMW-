@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>غرفة المحادثة السريعة</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #121212; color: white; text-align: center; padding: 10px; margin: 0; }
+        .video-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 15px; }
+        .video-box { width: 140px; height: 140px; background: #222; border-radius: 10px; overflow: hidden; border: 2px solid #00ffa3; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        button { background: #00ffa3; color: black; border: none; padding: 10px 20px; font-size: 15px; font-weight: bold; border-radius: 5px; cursor: pointer; margin: 5px; }
+        #chatBox { height: 180px; border: 1px solid #333; background: #1a1a1a; overflow-y: auto; margin-top: 20px; padding: 10px; text-align: right; border-radius: 8px; }
+        .message { margin-bottom: 8px; font-size: 14px; }
+        .chat-input-area { display: flex; gap: 5px; margin-top: 10px; }
+        .chat-input-area input { flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #444; background: #222; color: white; }
+    </style>
+</head>
+<body>
+
+    <h2>غرفة البث السريع والدردشة 🚀</h2>
+    <p id="my-id-display">جاري تجهيز معرف الغرفة الخاص بك...</p>
+    
+    <div class="chat-input-area" style="margin-bottom: 15px;">
+        <input type="text" id="remote-id-input" placeholder="ضع معرف صديقك للاتصال به...">
+        <button onclick="connectToPeer()">اتصال بالفيديو</button>
+    </div>
+
+    <div class="video-container">
+        <div class="video-box"><video id="local-video" autoplay muted playsinline></video></div>
+        <div class="video-box"><video id="remote-video" autoplay playsinline></video></div>
+    </div>
+
+    <div id="chatBox">
+        <div class="message"><b>النظام:</b> تم تشغيل الغرفة بنجاح وبدون قيود أمان!</div>
+    </div>
+    <div class="chat-input-area">
+        <input type="text" id="msgInput" placeholder="اكتب رسالتك هنا...">
+        <button onclick="sendMessage()">إرسال</button>
+    </div>
+
+    <script src="https://unpkg.com"></script>
+    
+    <script>
+        var peer = new Peer();
+        var localStream = null;
+        var currentConn = null;
+
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(function(stream) {
+                localStream = stream;
+                document.getElementById('local-video').srcObject = stream;
+            })
+            .catch(function(err) {
+                alert("برجاء السماح بإذن الكاميرا: " + err);
+            });
+
+        peer.on('open', function(id) {
+            document.getElementById('my-id-display').innerHTML = "معرف غرفتك الحالي هو: <b style='color:#00ffa3;'>" + id + "</b>";
+        });
+
+        peer.on('call', function(call) {
+            call.answer(localStream);
+            call.on('stream', function(remoteStream) {
+                document.getElementById('remote-video').srcObject = remoteStream;
+            });
+        });
+
+        peer.on('connection', function(conn) {
+            currentConn = conn;
+            conn.on('data', function(data) {
+                appendMessage("الطرف الآخر", data);
+            });
+        });
+
+        function connectToPeer() {
+            var remoteId = document.getElementById('remote-id-input').value;
+            if(!remoteId) {
+                alert("ضع معرف الطرف الآخر أولاً!");
+                return;
+            }
+
+            var call = peer.call(remoteId, localStream);
+            call.on('stream', function(remoteStream) {
+                document.getElementById('remote-video').srcObject = remoteStream;
+            });
+
+            currentConn = peer.connect(remoteId);
+            currentConn.on('open', function() {
+                appendMessage("النظام", "متصل الآن بالشات!");
+            });
+        }
+
+        function sendMessage() {
+            var input = document.getElementById("msgInput");
+            var text = input.value;
+            if(!text.trim()) return;
+
+            appendMessage("أنت", text);
+            if(currentConn) {
+                currentConn.send(text);
+            }
+            input.value = "";
+        }
+
+        function appendMessage(sender, text) {
+            var chatBox = document.getElementById("chatBox");
+            var newMsg = document.createElement("div");
+            newMsg.className = 'message';
+            newMsg.innerHTML = "<b>" + sender + ":</b> " + text;
+            chatBox.appendChild(newMsg);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+</body>
+</html>
+  
