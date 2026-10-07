@@ -7,7 +7,7 @@
     <style>
         body { font-family: Arial, sans-serif; background: #121212; color: white; text-align: center; padding: 10px; margin: 0; }
         .video-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 15px; }
-        .video-box { width: 140px; height: 140px; background: #222; border-radius: 10px; overflow: hidden; border: 2px solid #00ffa3; }
+        .video-box { width: 140px; height: 140px; background: #222; border-radius: 10px; overflow: hidden; border: 2px solid #00ffa3; position: relative; }
         button { background: #00ffa3; color: black; border: none; padding: 10px 20px; font-size: 15px; font-weight: bold; border-radius: 5px; cursor: pointer; margin: 5px; }
         #chatBox { height: 200px; border: 1px solid #333; background: #1a1a1a; overflow-y: auto; margin-top: 20px; padding: 10px; text-align: right; border-radius: 8px; }
         .message { margin-bottom: 8px; font-size: 14px; }
@@ -25,14 +25,14 @@
     <div class="video-container" id="video-streams"></div>
 
     <div id="chatBox">
-        <div class="message"><b>أحمد:</b> أهلاً بك!</div>
-        <div class="message"><b>سارة:</b> مرحباً جميعاً</div>
+        <div class="message"><b>نظام التطبيق:</b> أهلاً بك في غرفتك الجديدة!</div>
     </div>
     <div class="chat-input-area">
         <input type="text" id="msgInput" placeholder="اكتب رسالتك هنا...">
         <button class="send-btn" onclick="sendMessage()">إرسال</button>
     </div>
 
+    <!-- مكتبة Agora المحدثة والآمنة -->
     <script src="https://agora.io"></script>
     
     <script>
@@ -45,17 +45,33 @@
         let remoteUsers = {};
 
         document.getElementById('join-btn').onclick = async () => {
-            await client.join(APP_ID, CHANNEL, TOKEN, null);
-            localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
+            try {
+                // محاولة الاتصال بالسيرفر
+                await client.join(APP_ID, CHANNEL, TOKEN, null);
+                
+                // طلب تشغيل الميكروفون والكاميرا مع تفعيل خصائص الموبايل
+                localTracks = await AgoraRTC.createMicrophoneAndCameraTracks(
+                    { microphoneId: null },
+                    { cameraId: null, encoderConfig: "320p_1" }
+                );
 
-            let player = `<div class="video-box" id="user-local"></div>`;
-            document.getElementById('video-streams').insertAdjacentHTML('beforeend', player);
-            localTracks.play('user-local');
-            
-            await client.publish([localTracks, localTracks]);
+                let player = `<div class="video-box" id="user-local"></div>`;
+                document.getElementById('video-streams').insertAdjacentHTML('beforeend', player);
+                
+                // تشغيل محلي فوراً
+                await localTracks[1].play('user-local');
+                
+                // نشر البث للمشتركين
+                await client.publish(localTracks);
 
-            document.getElementById('join-btn').style.display = 'none';
-            document.getElementById('leave-btn').style.display = 'inline-block';
+                document.getElementById('join-btn').style.display = 'none';
+                document.getElementById('leave-btn').style.display = 'inline-block';
+                
+                alert("تم الانضمام بنجاح وتفعيل الكاميرا!");
+            } catch (error) {
+                console.error(error);
+                alert("حدث خطأ أثناء تشغيل الكاميرا: " + error.message);
+            }
         };
 
         client.on('user-published', async (user, mediaType) => {
@@ -82,9 +98,9 @@
         });
 
         document.getElementById('leave-btn').onclick = async () => {
-            for (let track of localTracks) {
-                track.stop();
-                track.close();
+            if(localTracks.length > 0) {
+                localTracks[0].stop(); localTracks[0].close();
+                localTracks[1].stop(); localTracks[1].close();
             }
             await client.leave();
             document.getElementById('video-streams').innerHTML = '';
